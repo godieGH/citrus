@@ -11,7 +11,7 @@
 #[derive(Debug, Clone)]
 pub struct Span {
     pub line: usize,
-    pub col:  usize,
+    pub col: usize,
 }
 
 // Wraps any AST node with its source position.
@@ -28,7 +28,6 @@ pub struct Spanned<T> {
 pub type SpannedExpr = Spanned<Expr>;
 pub type SpannedStmt = Spanned<Stmt>;
 
-
 // ─────────────────────────────────────────────
 // LITERALS
 // ─────────────────────────────────────────────
@@ -39,14 +38,13 @@ pub type SpannedStmt = Spanned<Stmt>;
 
 #[derive(Debug, Clone)]
 pub enum Lit {
-    Int(i128),          // covers all integer types — semantic stage narrows it
-    Float(f64),         // covers Float_32 and Float_64
-    Str(String),        // regular string "hello"
-    RawStr(String),     // raw string R"hello"
-    Char(char),         // character 'F'
-    Bool(bool),         // true or false
+    Int(i128),      // covers all integer types — semantic stage narrows it
+    Float(f64),     // covers Float_32 and Float_64
+    Str(String),    // regular string "hello"
+    RawStr(String), // raw string R"hello"
+    Char(char),     // character 'F'
+    Bool(bool),     // true or false
 }
-
 
 // ─────────────────────────────────────────────
 // TYPE EXPRESSIONS
@@ -66,15 +64,22 @@ pub enum TypeExpr {
     Void,
     Any,
 
-    Int8,   Int32,   Int64,   Int128,
-    UInt8,  UInt32,  UInt64,  UInt128,
-    Float32, Float64,
+    Int8,
+    Int32,
+    Int64,
+    Int128,
+    UInt8,
+    UInt32,
+    UInt64,
+    UInt128,
+    Float32,
+    Float64,
 
     // ── named type, possibly generic ─────────
     // covers: Animal, Option<Int_32>, Result<T, E>
     // Vector<Text>, Box<T> etc.
     Named {
-        name:     String,
+        name: String,
         generics: Vec<TypeExpr>,
     },
 
@@ -82,17 +87,16 @@ pub enum TypeExpr {
     // &Int_32 or &mutable Int_32
     Ref {
         mutable: bool,
-        inner:   Box<TypeExpr>,     // Box because TypeExpr contains TypeExpr
+        inner: Box<TypeExpr>, // Box because TypeExpr contains TypeExpr
     },
 
     // ── fixed-size array ─────────────────────
     // [UInt_8:5]
     Array {
         element: Box<TypeExpr>,
-        size:    u64,
+        size: u64,
     },
 }
-
 
 // ─────────────────────────────────────────────
 // OPERATORS
@@ -104,13 +108,27 @@ pub enum TypeExpr {
 #[derive(Debug, Clone)]
 pub enum BinaryOp {
     // math
-    Add, Sub, Mul, Div, Mod,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
     // comparison — produce Bool
-    Eq, NotEq, Lt, Gt, LtEq, GtEq,
+    Eq,
+    NotEq,
+    Lt,
+    Gt,
+    LtEq,
+    GtEq,
     // logical — operands must be Bool
-    And, Or,
+    And,
+    Or,
     // bitwise — operands must be integers
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
 }
 
 #[derive(Debug, Clone)]
@@ -122,14 +140,13 @@ pub enum UnaryOp {
 
 #[derive(Debug, Clone)]
 pub enum AssignOp {
-    Assign,        // =
-    AddAssign,     // +=
-    SubAssign,     // -=
-    MulAssign,     // *=
-    DivAssign,     // /=
-    ModAssign,     // %=
+    Assign,    // =
+    AddAssign, // +=
+    SubAssign, // -=
+    MulAssign, // *=
+    DivAssign, // /=
+    ModAssign, // %=
 }
-
 
 // ─────────────────────────────────────────────
 // PATTERNS
@@ -159,15 +176,15 @@ pub enum Pattern {
     // Shape::Circle(r)        — path=["Shape","Circle"],    fields=[Identifier("r")]
     // Message::Move { x, y } — uses StructVariant below
     EnumVariant {
-        path:   Vec<String>,
+        path: Vec<String>,
         fields: Vec<Pattern>,
     },
 
     // struct-style enum variant
     // Message::Move { x, y }
     StructVariant {
-        path:   Vec<String>,
-        fields: Vec<(String, Pattern)>,  // field name → pattern
+        path: Vec<String>,
+        fields: Vec<(String, Pattern)>, // field name → pattern
     },
 
     // multiple patterns on one arm
@@ -177,12 +194,11 @@ pub enum Pattern {
     // range pattern in match
     // 0..=59 => { }
     Range {
-        start:     Box<Pattern>,
-        end:       Box<Pattern>,
+        start: Box<Pattern>,
+        end: Box<Pattern>,
         inclusive: bool,
     },
 }
-
 
 // ─────────────────────────────────────────────
 // CAPTURE CLAUSE — anonymous functions
@@ -191,10 +207,10 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub enum CaptureClause {
-    CopyAll,    // []          — copy everything (default, dangerous for non-Copy)
-    RefAll,     // [&]         — borrow everything (recommended default)
-    MutRefAll,  // [&mutable]  — mutably borrow everything
-    MoveAll,    // [=]         — move everything
+    CopyAll,   // []          — copy everything (default, dangerous for non-Copy)
+    RefAll,    // [&]         — borrow everything (recommended default)
+    MutRefAll, // [&mutable]  — mutably borrow everything
+    MoveAll,   // [=]         — move everything
 
     // [&a, =b, c]  — per-variable explicit captures
     Explicit(Vec<ExplicitCapture>),
@@ -208,12 +224,11 @@ pub struct ExplicitCapture {
 
 #[derive(Debug, Clone)]
 pub enum ExplicitCaptureKind {
-    Copy,       // bare name  — t
-    Ref,        // &name      — &a
-    MutRef,     // &mutable   — &mutable a
-    Move,       // =name      — =c
+    Copy,   // bare name  — t
+    Ref,    // &name      — &a
+    MutRef, // &mutable   — &mutable a
+    Move,   // =name      — =c
 }
-
 
 // ─────────────────────────────────────────────
 // EXPRESSIONS
@@ -229,7 +244,6 @@ pub enum ExplicitCaptureKind {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-
     // ── literals ─────────────────────────────
     Literal(Lit),
 
@@ -239,15 +253,15 @@ pub enum Expr {
     // ── binary operation ─────────────────────
     // x + y   x == y   x && y   etc.
     BinaryOp {
-        left:  Box<SpannedExpr>,
-        op:    BinaryOp,
+        left: Box<SpannedExpr>,
+        op: BinaryOp,
         right: Box<SpannedExpr>,
     },
 
     // ── unary operation ──────────────────────
     // -x   !x   ~x
     UnaryOp {
-        op:   UnaryOp,
+        op: UnaryOp,
         expr: Box<SpannedExpr>,
     },
 
@@ -256,22 +270,22 @@ pub enum Expr {
     // target must resolve to something assignable
     Assign {
         target: Box<SpannedExpr>,
-        op:     AssignOp,
-        value:  Box<SpannedExpr>,
+        op: AssignOp,
+        value: Box<SpannedExpr>,
     },
 
     // ── member access ────────────────────────
     // animal.name
     FieldAccess {
         object: Box<SpannedExpr>,
-        field:  String,
+        field: String,
     },
 
     // ── index access ─────────────────────────
     // scores[0]
     IndexAccess {
         object: Box<SpannedExpr>,
-        index:  Box<SpannedExpr>,
+        index: Box<SpannedExpr>,
     },
 
     // ── method call ──────────────────────────
@@ -280,38 +294,38 @@ pub enum Expr {
     MethodCall {
         object: Box<SpannedExpr>,
         method: String,
-        args:   Vec<CallArg>,
+        args: Vec<CallArg>,
     },
 
     // ── function call ────────────────────────
     // add(1, 2)   transform<Animal>(my_animal)
     FunctionCall {
-        name:     String,
-        generics: Vec<TypeExpr>,    // the <T> in fn<T>(...)
-        args:     Vec<CallArg>,
+        name: String,
+        generics: Vec<TypeExpr>, // the <T> in fn<T>(...)
+        args: Vec<CallArg>,
     },
 
     // ── reference ────────────────────────────
     // &x   &mutable x
     Ref {
         mutable: bool,
-        expr:    Box<SpannedExpr>,
+        expr: Box<SpannedExpr>,
     },
 
     // ── range ────────────────────────────────
     // 0..10   0..=10
     Range {
-        start:     Box<SpannedExpr>,
-        end:       Box<SpannedExpr>,
+        start: Box<SpannedExpr>,
+        end: Box<SpannedExpr>,
         inclusive: bool,
     },
 
     // ── struct instantiation ─────────────────
     // Animal { name: "Lion", height: 120 }
     StructInit {
-        name:     String,
+        name: String,
         generics: Vec<TypeExpr>,
-        fields:   Vec<FieldInit>,
+        fields: Vec<FieldInit>,
     },
 
     // ── enum variant ─────────────────────────
@@ -319,8 +333,8 @@ pub enum Expr {
     // Shape::Circle(5.0)
     // Message::Move { x: 10, y: 20 }
     EnumVariant {
-        path:   Vec<String>,         // ["Direction", "North"]
-        kind:   EnumVariantInit,
+        path: Vec<String>, // ["Direction", "North"]
+        kind: EnumVariantInit,
     },
 
     // ── anonymous function ───────────────────
@@ -328,32 +342,31 @@ pub enum Expr {
     // [&](x as Int_32) -> Int_32 { return x * 2; }
     Closure {
         capture: CaptureClause,
-        params:  Vec<ClosureParam>,
-        ret:     Option<TypeExpr>,
-        body:    ClosureBody,
+        params: Vec<ClosureParam>,
+        ret: Option<TypeExpr>,
+        body: ClosureBody,
     },
 
     // ── if as expression ─────────────────────
     // let x = if condition { "yes" } else { "no" };
     // else branch is required when used as expression
     IfExpr {
-        condition:  Box<SpannedExpr>,
+        condition: Box<SpannedExpr>,
         then_block: Block,
-        else_block: Box<Block>,     // required — no else means no value
+        else_block: Box<Block>, // required — no else means no value
     },
 
     // ── match as expression ──────────────────
     // let v = match result { Ok(v) => v, Err(_) => 0 };
     MatchExpr {
         value: Box<SpannedExpr>,
-        arms:  Vec<MatchArm>,
+        arms: Vec<MatchArm>,
     },
 
     // ── ? operator ───────────────────────────
     // result?   — propagates Err early
     Try(Box<SpannedExpr>),
 }
-
 
 // ─────────────────────────────────────────────
 // EXPRESSION SUPPORT TYPES
@@ -372,16 +385,16 @@ pub enum CallArg {
 //          ^^^^^^^^^^^^  ^^^^^^^^^^^^^
 #[derive(Debug, Clone)]
 pub struct FieldInit {
-    pub name:  String,
+    pub name: String,
     pub value: SpannedExpr,
 }
 
 // How an enum variant is initialized
 #[derive(Debug, Clone)]
 pub enum EnumVariantInit {
-    Unit,                              // Direction::North
-    Tuple(Vec<SpannedExpr>),           // Shape::Circle(5.0)
-    Struct(Vec<FieldInit>),            // Message::Move { x: 10, y: 20 }
+    Unit,                    // Direction::North
+    Tuple(Vec<SpannedExpr>), // Shape::Circle(5.0)
+    Struct(Vec<FieldInit>),  // Message::Move { x: 10, y: 20 }
 }
 
 // A closure parameter — type optional (can be inferred in shorthand)
@@ -389,7 +402,7 @@ pub enum EnumVariantInit {
 #[derive(Debug, Clone)]
 pub struct ClosureParam {
     pub name: String,
-    pub ty:   Option<TypeExpr>,
+    pub ty: Option<TypeExpr>,
 }
 
 // The body of a closure — either shorthand or full block
@@ -405,8 +418,8 @@ pub enum ClosureBody {
 #[derive(Debug, Clone)]
 pub struct MatchArm {
     pub pattern: Pattern,
-    pub body:    MatchBody,
-    pub span:    Span,
+    pub body: MatchBody,
+    pub span: Span,
 }
 
 // Match arm body — either a block or a single expression
@@ -424,9 +437,8 @@ pub enum MatchBody {
 #[derive(Debug, Clone)]
 pub enum ElseBranch {
     Block(Block),
-    If(Box<SpannedStmt>),    // else if chains as nested Stmt::If
+    If(Box<SpannedStmt>), // else if chains as nested Stmt::If
 }
-
 
 // ─────────────────────────────────────────────
 // BLOCK
@@ -439,9 +451,8 @@ pub enum ElseBranch {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<SpannedStmt>,
-    pub span:  Span,
+    pub span: Span,
 }
-
 
 // ─────────────────────────────────────────────
 // STATEMENTS
@@ -452,15 +463,14 @@ pub struct Block {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-
     // ── variable declaration ─────────────────
     // let x as Int_32 = 60;
     // let mutable x as Int_32;
     Let {
         mutable: bool,
-        name:    String,
-        ty:      Option<TypeExpr>,   // None when inferred
-        value:   Option<SpannedExpr>, // None when uninitialized
+        name: String,
+        ty: Option<TypeExpr>,       // None when inferred
+        value: Option<SpannedExpr>, // None when uninitialized
     },
 
     // ── return ───────────────────────────────
@@ -472,7 +482,7 @@ pub enum Stmt {
     // while x < 10 { x += 1; }
     While {
         condition: Box<SpannedExpr>,
-        body:      Block,
+        body: Block,
     },
 
     // ── for-in loop ──────────────────────────
@@ -480,9 +490,9 @@ pub enum Stmt {
     // for item in items { }
     // for i, item in items.enumerate() { }
     ForIn {
-        var:        ForVar,         // single var or index+var
-        iterable:   Box<SpannedExpr>,
-        body:       Block,
+        var: ForVar, // single var or index+var
+        iterable: Box<SpannedExpr>,
+        body: Block,
     },
 
     // ── infinite loop ────────────────────────
@@ -496,8 +506,8 @@ pub enum Stmt {
     // ── if as statement ──────────────────────
     // if x > 0 { } else if x == 0 { } else { }
     If {
-        condition:   Box<SpannedExpr>,
-        then_block:  Block,
+        condition: Box<SpannedExpr>,
+        then_block: Block,
         else_branch: Option<ElseBranch>,
     },
 
@@ -505,7 +515,7 @@ pub enum Stmt {
     // match value { 0 => { } _ => { } }
     Match {
         value: Box<SpannedExpr>,
-        arms:  Vec<MatchArm>,
+        arms: Vec<MatchArm>,
     },
 
     // ── expression statement ─────────────────
@@ -523,7 +533,6 @@ pub enum ForVar {
     Single(String),
     Indexed { index: String, value: String },
 }
-
 
 // ─────────────────────────────────────────────
 // TOP-LEVEL ITEMS
@@ -544,7 +553,6 @@ pub enum Item {
     Module(ModuleDecl),
 }
 
-
 // ─────────────────────────────────────────────
 // FUNCTION DEFINITION
 // ─────────────────────────────────────────────
@@ -553,33 +561,32 @@ pub enum Item {
 
 #[derive(Debug, Clone)]
 pub struct FunctionDef {
-    pub public:       bool,
-    pub name:         String,
-    pub generics:     Vec<String>,          // the T in fn<T>
-    pub params:       Vec<Param>,
-    pub ret:          TypeExpr,             // return type — Void if nothing
-    pub where_clause: Vec<WhereBound>,      // where T implements Speak + Walk
-    pub body:         Block,
-    pub span:         Span,
+    pub public: bool,
+    pub name: String,
+    pub generics: Vec<String>, // the T in fn<T>
+    pub params: Vec<Param>,
+    pub ret: TypeExpr,                 // return type — Void if nothing
+    pub where_clause: Vec<WhereBound>, // where T implements Speak + Walk
+    pub body: Block,
+    pub span: Span,
 }
 
 // A function parameter — x as Int_32
 // or self / mutable self
 #[derive(Debug, Clone)]
 pub struct Param {
-    pub name:    String,
-    pub ty:      TypeExpr,
-    pub mutable: bool,         // mutable self
-    pub is_self: bool,         // true when param is `self`
+    pub name: String,
+    pub ty: TypeExpr,
+    pub mutable: bool, // mutable self
+    pub is_self: bool, // true when param is `self`
 }
 
 // A generic where bound — T implements Speak + Walk
 #[derive(Debug, Clone)]
 pub struct WhereBound {
-    pub param:  String,          // T
-    pub bounds: Vec<String>,     // ["Speak", "Walk"]
+    pub param: String,       // T
+    pub bounds: Vec<String>, // ["Speak", "Walk"]
 }
-
 
 // ─────────────────────────────────────────────
 // STRUCT DEFINITION
@@ -589,19 +596,18 @@ pub struct WhereBound {
 
 #[derive(Debug, Clone)]
 pub struct StructDef {
-    pub public:   bool,
-    pub name:     String,
+    pub public: bool,
+    pub name: String,
     pub generics: Vec<String>,
-    pub fields:   Vec<StructField>,
-    pub span:     Span,
+    pub fields: Vec<StructField>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct StructField {
     pub name: String,
-    pub ty:   TypeExpr,
+    pub ty: TypeExpr,
 }
-
 
 // ─────────────────────────────────────────────
 // ENUM DEFINITION
@@ -612,11 +618,11 @@ pub struct StructField {
 
 #[derive(Debug, Clone)]
 pub struct EnumDef {
-    pub public:   bool,
-    pub name:     String,
+    pub public: bool,
+    pub name: String,
     pub generics: Vec<String>,
     pub variants: Vec<EnumVariant>,
-    pub span:     Span,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -628,12 +634,11 @@ pub struct EnumVariant {
 
 #[derive(Debug, Clone)]
 pub enum EnumVariantKind {
-    Unit,                           // North
-    Tuple(Vec<TypeExpr>),           // Circle(Float_32)
-    Struct(Vec<StructField>),       // Move { x as Int_32, y as Int_32 }
-    Discriminant(i64),              // Active = 1
+    Unit,                     // North
+    Tuple(Vec<TypeExpr>),     // Circle(Float_32)
+    Struct(Vec<StructField>), // Move { x as Int_32, y as Int_32 }
+    Discriminant(i64),        // Active = 1
 }
-
 
 // ─────────────────────────────────────────────
 // TRAIT DEFINITION
@@ -643,23 +648,22 @@ pub enum EnumVariantKind {
 
 #[derive(Debug, Clone)]
 pub struct TraitDef {
-    pub public:  bool,
-    pub name:    String,
+    pub public: bool,
+    pub name: String,
     pub generics: Vec<String>,
     pub methods: Vec<TraitMethod>,
-    pub span:    Span,
+    pub span: Span,
 }
 
 // A method inside a trait — may have a default body or just a signature
 #[derive(Debug, Clone)]
 pub struct TraitMethod {
-    pub name:    String,
-    pub params:  Vec<Param>,
-    pub ret:     TypeExpr,
-    pub default: Option<Block>,    // None = signature only, Some = default impl
-    pub span:    Span,
+    pub name: String,
+    pub params: Vec<Param>,
+    pub ret: TypeExpr,
+    pub default: Option<Block>, // None = signature only, Some = default impl
+    pub span: Span,
 }
-
 
 // ─────────────────────────────────────────────
 // IMPLEMENT BLOCKS
@@ -668,23 +672,22 @@ pub struct TraitMethod {
 // implement Animal { ... }
 #[derive(Debug, Clone)]
 pub struct ImplBlock {
-    pub target:   String,
+    pub target: String,
     pub generics: Vec<String>,
-    pub methods:  Vec<FunctionDef>,
-    pub span:     Span,
+    pub methods: Vec<FunctionDef>,
+    pub span: Span,
 }
 
 // implement Speak for Animal { ... }
 #[derive(Debug, Clone)]
 pub struct ImplTraitBlock {
-    pub trait_name:     String,
-    pub target:         String,
-    pub generics:       Vec<String>,
-    pub where_clause:   Vec<WhereBound>,
-    pub methods:        Vec<FunctionDef>,
-    pub span:           Span,
+    pub trait_name: String,
+    pub target: String,
+    pub generics: Vec<String>,
+    pub where_clause: Vec<WhereBound>,
+    pub methods: Vec<FunctionDef>,
+    pub span: Span,
 }
-
 
 // ─────────────────────────────────────────────
 // IMPORT
@@ -695,18 +698,17 @@ pub struct ImplTraitBlock {
 
 #[derive(Debug, Clone)]
 pub struct ImportDecl {
-    pub path:  Vec<String>,      // ["animals"] from  animals::Animal
+    pub path: Vec<String>, // ["animals"] from  animals::Animal
     pub items: ImportItems,
-    pub span:  Span,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub enum ImportItems {
-    Single(String),              // import math::calculate  → Single("calculate")
-    Multiple(Vec<String>),       // import animals::{Animal, Speak}
-    All,                         // import animals::*
+    Single(String),        // import math::calculate  → Single("calculate")
+    Multiple(Vec<String>), // import animals::{Animal, Speak}
+    All,                   // import animals::*
 }
-
 
 // ─────────────────────────────────────────────
 // STATIC CONSTANT
@@ -717,12 +719,11 @@ pub enum ImportItems {
 #[derive(Debug, Clone)]
 pub struct StaticDecl {
     pub public: bool,
-    pub name:   String,
-    pub ty:     TypeExpr,
-    pub value:  SpannedExpr,
-    pub span:   Span,
+    pub name: String,
+    pub ty: TypeExpr,
+    pub value: SpannedExpr,
+    pub span: Span,
 }
-
 
 // ─────────────────────────────────────────────
 // MODULE
@@ -732,11 +733,10 @@ pub struct StaticDecl {
 #[derive(Debug, Clone)]
 pub struct ModuleDecl {
     pub public: bool,
-    pub name:   String,
-    pub items:  Vec<Spanned<Item>>,
-    pub span:   Span,
+    pub name: String,
+    pub items: Vec<Spanned<Item>>,
+    pub span: Span,
 }
-
 
 // ─────────────────────────────────────────────
 // PROGRAM — the root of the whole AST
@@ -746,6 +746,6 @@ pub struct ModuleDecl {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub items:    Vec<Spanned<Item>>,
+    pub items: Vec<Spanned<Item>>,
     pub filename: String,
 }

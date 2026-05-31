@@ -1,13 +1,13 @@
 // src/parser/mod.rs
 
 pub mod ast;
-mod types;
+mod exprs;
 mod items;
 mod stmts;
-mod exprs;
+mod types;
 
-use crate::lexer::{Lexeme, Token};
 use crate::error::CitrusError;
+use crate::lexer::{Lexeme, Token};
 use ast::*;
 
 // ─────────────────────────────────────────────
@@ -22,16 +22,19 @@ use ast::*;
 // We never go backwards — recursive descent is always forward-only.
 
 pub struct Parser {
-    tokens:   Vec<Lexeme>,
-    cursor:   usize,
+    tokens: Vec<Lexeme>,
+    cursor: usize,
     filename: String,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Lexeme>, filename: String) -> Self {
-        Parser { tokens, cursor: 0, filename }
+        Parser {
+            tokens,
+            cursor: 0,
+            filename,
+        }
     }
-
 
     // ── LOOKING AT TOKENS ────────────────────────────────────────────
     //
@@ -61,7 +64,6 @@ impl Parser {
     fn at_end(&self) -> bool {
         self.cursor >= self.tokens.len()
     }
-
 
     // ── CONSUMING TOKENS ─────────────────────────────────────────────
     //
@@ -126,7 +128,7 @@ impl Parser {
                 let lex = self.advance().unwrap();
                 Ok(lex.src)
             }
-            _ => Err(self.error_expected("identifier".to_string()))
+            _ => Err(self.error_expected("identifier".to_string())),
         }
     }
 
@@ -138,7 +140,7 @@ impl Parser {
                 let lex = self.advance().unwrap();
                 Ok(lex.src)
             }
-            _ => Err(self.error_expected("identifier or 'self'".to_string()))
+            _ => Err(self.error_expected("identifier or 'self'".to_string())),
         }
     }
 
@@ -148,14 +150,13 @@ impl Parser {
         match self.current() {
             Some(Token::IntLiteral) => {
                 let lex = self.advance().unwrap();
-                lex.src.parse::<u64>().map_err(|_| {
-                    self.error_expected("positive integer".to_string())
-                })
+                lex.src
+                    .parse::<u64>()
+                    .map_err(|_| self.error_expected("positive integer".to_string()))
             }
-            _ => Err(self.error_expected("integer literal".to_string()))
+            _ => Err(self.error_expected("integer literal".to_string())),
         }
     }
-
 
     // ── SPAN HELPERS ─────────────────────────────────────────────────
     //
@@ -164,8 +165,11 @@ impl Parser {
 
     fn span(&self) -> Span {
         match self.peek() {
-            Some(lex) => Span { line: lex.line, col: lex.col },
-            None      => Span { line: 0, col: 0 },  // end of file
+            Some(lex) => Span {
+                line: lex.line,
+                col: lex.col,
+            },
+            None => Span { line: 0, col: 0 }, // end of file
         }
     }
 
@@ -178,7 +182,6 @@ impl Parser {
     fn spanned<T>(&self, node: T, span: Span) -> Spanned<T> {
         Spanned { node, span }
     }
-
 
     // ── ERROR HELPERS ─────────────────────────────────────────────────
     //
@@ -198,7 +201,7 @@ impl Parser {
 
     fn error_eof(&self, message: String) -> CitrusError {
         CitrusError::UnexpectedEof {
-            file:    self.filename.clone(),
+            file: self.filename.clone(),
             message,
         }
     }
@@ -211,18 +214,17 @@ impl Parser {
                 // for identifiers and literals, show the actual text
                 // for keywords and symbols, show the token name
                 let desc = match &lex.token {
-                    Token::Identifier   => format!("'{}'", lex.src),
-                    Token::IntLiteral   => format!("integer '{}'", lex.src),
+                    Token::Identifier => format!("'{}'", lex.src),
+                    Token::IntLiteral => format!("integer '{}'", lex.src),
                     Token::FloatLiteral => format!("float '{}'", lex.src),
                     Token::StringLiteral => format!("string {}", lex.src),
-                    other               => format!("'{:?}'", other),
+                    other => format!("'{:?}'", other),
                 };
                 (lex.line, lex.col, desc)
             }
             None => (0, 0, "end of file".to_string()),
         }
     }
-
 
     // ── ENTRY POINT ──────────────────────────────────────────────────
     //
@@ -236,14 +238,16 @@ impl Parser {
 
         while !self.at_end() {
             let start = self.span();
-            let item  = self.parse_item()?;
-            items.push(Spanned { node: item, span: start });
+            let item = self.parse_item()?;
+            items.push(Spanned {
+                node: item,
+                span: start,
+            });
         }
 
         Ok(Program { items, filename })
     }
 }
-
 
 // ─────────────────────────────────────────────
 // PUBLIC ENTRY POINT

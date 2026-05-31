@@ -16,13 +16,12 @@
 //   MyStruct
 //   Box<T>
 
-use crate::lexer::Token;
-use crate::error::CitrusError;
 use super::Parser;
 use super::ast::*;
+use crate::error::CitrusError;
+use crate::lexer::Token;
 
 impl Parser {
-
     // ── MAIN TYPE ENTRY POINT ─────────────────────────────────────────
     //
     // Look at the current token and decide what kind of type it is.
@@ -30,46 +29,87 @@ impl Parser {
 
     pub fn parse_type(&mut self) -> Result<TypeExpr, CitrusError> {
         match self.current() {
-
             // reference type — starts with &
             Some(Token::Ampersand) => self.parse_ref_type(),
 
             // array type — starts with [
-            Some(Token::LBracket)  => self.parse_array_type(),
+            Some(Token::LBracket) => self.parse_array_type(),
 
             // all built-in primitive types
-            Some(Token::TypeText)    => { self.advance(); Ok(TypeExpr::Text)    }
-            Some(Token::TypeChar)    => { self.advance(); Ok(TypeExpr::Char)    }
-            Some(Token::TypeBool)    => { self.advance(); Ok(TypeExpr::Bool)    }
-            Some(Token::TypeVoid)    => { self.advance(); Ok(TypeExpr::Void)    }
-            Some(Token::TypeAny)     => { self.advance(); Ok(TypeExpr::Any)     }
+            Some(Token::TypeText) => {
+                self.advance();
+                Ok(TypeExpr::Text)
+            }
+            Some(Token::TypeChar) => {
+                self.advance();
+                Ok(TypeExpr::Char)
+            }
+            Some(Token::TypeBool) => {
+                self.advance();
+                Ok(TypeExpr::Bool)
+            }
+            Some(Token::TypeVoid) => {
+                self.advance();
+                Ok(TypeExpr::Void)
+            }
+            Some(Token::TypeAny) => {
+                self.advance();
+                Ok(TypeExpr::Any)
+            }
 
-            Some(Token::TypeInt8)    => { self.advance(); Ok(TypeExpr::Int8)    }
-            Some(Token::TypeInt32)   => { self.advance(); Ok(TypeExpr::Int32)   }
-            Some(Token::TypeInt64)   => { self.advance(); Ok(TypeExpr::Int64)   }
-            Some(Token::TypeInt128)  => { self.advance(); Ok(TypeExpr::Int128)  }
+            Some(Token::TypeInt8) => {
+                self.advance();
+                Ok(TypeExpr::Int8)
+            }
+            Some(Token::TypeInt32) => {
+                self.advance();
+                Ok(TypeExpr::Int32)
+            }
+            Some(Token::TypeInt64) => {
+                self.advance();
+                Ok(TypeExpr::Int64)
+            }
+            Some(Token::TypeInt128) => {
+                self.advance();
+                Ok(TypeExpr::Int128)
+            }
 
-            Some(Token::TypeUInt8)   => { self.advance(); Ok(TypeExpr::UInt8)   }
-            Some(Token::TypeUInt32)  => { self.advance(); Ok(TypeExpr::UInt32)  }
-            Some(Token::TypeUInt64)  => { self.advance(); Ok(TypeExpr::UInt64)  }
-            Some(Token::TypeUInt128) => { self.advance(); Ok(TypeExpr::UInt128) }
+            Some(Token::TypeUInt8) => {
+                self.advance();
+                Ok(TypeExpr::UInt8)
+            }
+            Some(Token::TypeUInt32) => {
+                self.advance();
+                Ok(TypeExpr::UInt32)
+            }
+            Some(Token::TypeUInt64) => {
+                self.advance();
+                Ok(TypeExpr::UInt64)
+            }
+            Some(Token::TypeUInt128) => {
+                self.advance();
+                Ok(TypeExpr::UInt128)
+            }
 
-            Some(Token::TypeFloat32) => { self.advance(); Ok(TypeExpr::Float32) }
-            Some(Token::TypeFloat64) => { self.advance(); Ok(TypeExpr::Float64) }
+            Some(Token::TypeFloat32) => {
+                self.advance();
+                Ok(TypeExpr::Float32)
+            }
+            Some(Token::TypeFloat64) => {
+                self.advance();
+                Ok(TypeExpr::Float64)
+            }
 
             // a name — either a custom type or a generic like Option<T>
             // Option, Result, Vector, Animal, MyStruct, T ...
-            Some(Token::Identifier)  => self.parse_named_type(),
+            Some(Token::Identifier) => self.parse_named_type(),
 
             // anything else is not a valid type
-            _ => {
-                Err(self.error_expected(
-                    "type (e.g. Int_32, Text, Option<T>, &Bool, [UInt_8:5])".to_string()
-                ))
-            }
+            _ => Err(self.error_expected(
+                "type (e.g. Int_32, Text, Option<T>, &Bool, [UInt_8:5])".to_string(),
+            )),
         }
     }
-
 
     // ── REFERENCE TYPE ────────────────────────────────────────────────
     //
@@ -93,7 +133,6 @@ impl Parser {
             inner: Box::new(inner),
         })
     }
-
 
     // ── ARRAY TYPE ────────────────────────────────────────────────────
     //
@@ -122,7 +161,6 @@ impl Parser {
         })
     }
 
-
     // ── NAMED TYPE ────────────────────────────────────────────────────
     //
     // A named type is an identifier, optionally followed by <generics>.
@@ -148,7 +186,6 @@ impl Parser {
 
         Ok(TypeExpr::Named { name, generics })
     }
-
 
     // ── GENERIC ARGUMENTS ─────────────────────────────────────────────
     //
@@ -186,7 +223,6 @@ impl Parser {
         Ok(args)
     }
 
-
     // ── GENERIC PARAMETERS ────────────────────────────────────────────
     //
     // The <T, U> in a *definition* — struct Box<T>, fn transform<T, U>
@@ -211,7 +247,9 @@ impl Parser {
         params.push(self.expect_identifier()?);
 
         while self.eat(&Token::Comma) {
-            if self.check(&Token::Gt) { break; }
+            if self.check(&Token::Gt) {
+                break;
+            }
             params.push(self.expect_identifier()?);
         }
 
@@ -219,7 +257,6 @@ impl Parser {
 
         Ok(params)
     }
-
 
     // ── WHERE CLAUSE ──────────────────────────────────────────────────
     //
@@ -258,7 +295,10 @@ impl Parser {
                 traits.push(self.expect_identifier()?);
             }
 
-            bounds.push(WhereBound { param, bounds: traits });
+            bounds.push(WhereBound {
+                param,
+                bounds: traits,
+            });
 
             // multiple bounds are separated by comma
             // where T implements Speak, U implements Clone

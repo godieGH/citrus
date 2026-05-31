@@ -3,7 +3,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CitrusError {
-
     #[error("expected a .citrus file — '{0}'")]
     InvalidExtension(String),
 
@@ -20,8 +19,8 @@ pub enum CitrusError {
     LexError {
         file: String,
         line: usize,
-        col:  usize,
-        src:  String,
+        col: usize,
+        src: String,
     },
 
     // added now — parser errors
@@ -30,16 +29,13 @@ pub enum CitrusError {
     #[error("parse error at {file}:{line}:{col} — expected {expected}, found {found}")]
     ParseError {
         expected: String,
-        found:    String,
-        file:     String,
-        line:     usize,
-        col:      usize,
+        found: String,
+        file: String,
+        line: usize,
+        col: usize,
     },
 
     // when we reach end of file unexpectedly
     #[error("unexpected end of file in {file} — {message}")]
-    UnexpectedEof {
-        file:    String,
-        message: String,
-    },
+    UnexpectedEof { file: String, message: String },
 }

@@ -1,11 +1,12 @@
 // src/main.rs
-mod error;
-mod load_source;
-mod lexer;
 mod compiler;
+mod error;
+mod lexer;
+mod load_source;
+mod parser;
 
-use std::env;
 use compiler::CompileOptions;
+use std::env;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
