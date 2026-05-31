@@ -1,0 +1,67 @@
+
+// citrus has only one text type 
+// Text which shouldn't be simple it is heap allocated not stack and it is only readable
+// no copying it is moved and owned unless explicitly done so
+let x as Text = "Hello World!";
+
+// Numeric types are
+// Int_8, Int_32, Int_64, Int_128
+// UInt_8, UInt_32, UInt_64, UInt_128
+let y as Int_8 = 60;
+
+// Float types
+// Float_32 and Float_64
+let x as Float_32 = 53.12;
+
+// character type
+let c as Char = 'F'; // use single quotes as in C
+
+// boolean type
+let state as Bool = true;
+let state as Bool = false;
+
+// citrus can infer built in types too if not specified with (as Type)
+
+// so the syntax is
+// let var as Type = value;
+// VD can be uninitialize at first but should be typed at first no infer there
+// generics calling should be typed no infering
+// custom types should be typed no infer
+
+// custom types... citrus has structs no classes no inheritence
+struct Animal { // PascalCase
+  name as Text,
+  height as Int_32
+} 
+// structs do not take methods they are just layouts
+// we use Impl to implement methods
+
+implement Animal {}
+
+trait Speak {}
+implement Speak for Animal {}
+
+// functions
+// the main function
+// syntax
+main() -> UInt_32 {} 
+
+// other function
+calculate(x as String, y as UInt_32) -> UInt_32 {
+  return 57272;
+}
+
+// function should have return types specified if no should use Any or Void to mean nothing
+// params Types should ne specified
+
+// calling a function
+call_fn("hello world", y=5)
+
+# calling by reference
+let x = 5;
+call_fn(&x);
+call_fn(&mutable x); // mutable reference
+
+// all variable are immutable by default you shout use mutable key world to make them mutable
+let mutable x as UInt_32 = 5;
+let mutable f as &mutable UInt_32 = &x;
