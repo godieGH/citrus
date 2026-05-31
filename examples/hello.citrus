@@ -1,9 +1,5 @@
 
-main() -> size {
-  
-  let x = {
-    let p = 6;
-    5 * p
-  };
-  
+@derive(Debug)
+struct Car {
+  name as Text
 }

@@ -107,7 +107,7 @@ let msg as Text = "Hello World";
 - Heap allocated
 - Owned — not copied, **moved** unless explicitly cloned
 - Immutable by default
-- No stack string type
+- No stack string type; always owned UTF-8
 
 **String literal forms**
 
@@ -166,14 +166,43 @@ let f as Float_32 = 53.12;
 let g as Float_64 = 1_200.500_1;  // underscores in floats
 ```
 
-### Void and Any
+### Unit and Tuples
+
+`()` is the unit type — used as the return type for functions that return nothing.
 
 ```citrus
-// used as return types only — not valid for variables
+// unit — returned by functions with no meaningful value
+greet() -> () {
+    println!("Hello");
+}
 
-calculate() -> Void { }     // returns nothing
-box_it<T>() -> Any { }      // returns any type — use sparingly
+// tuple — two or more types grouped
+let pair as (Int_32, Text) = (42, "hello");
+let triple as (Bool, Float_32, UInt_8) = (true, 3.14, 255);
+
+// unit tuple — same as ()
+let nothing as () = ();
 ```
+
+**Tuple access**
+
+```citrus
+let x = pair.0;   // 42
+let y = pair.1;   // "hello"
+```
+
+**Tuple destructuring (pattern)**
+
+```citrus
+let (a, b) = pair;
+
+match pair {
+    (0, _) => { println!("first is zero"); }
+    (x, y) => { println!("{} {}", x, y); }
+}
+```
+
+> `Void` and `Any` no longer exist. Use `()` where you previously used `Void`. There is no dynamic `Any` type.
 
 ---
 
@@ -227,11 +256,12 @@ call_fn(&mutable x);
 ```
 =       assignment
 ->      return type arrow
-=>      fat arrow (shorthand lambda body)
+=>      fat arrow (shorthand lambda body / macro arm)
 ?       error propagation
 ..      exclusive range     0..5  means 0,1,2,3,4
 ..=     inclusive range     0..=5 means 0,1,2,3,4,5
 &       reference / bitwise AND
+$       macro variable / metavariable
 .       member access
 ::      path separator
 @       attribute prefix
@@ -261,8 +291,8 @@ add(x as Int_32, y as Int_32) -> Int_32 {
     return x + y;
 }
 
-// no return value
-log(msg as Text) -> Void {
+// no return value — use ()
+log(msg as Text) -> () {
     println!("{}", msg);
 }
 
@@ -283,9 +313,10 @@ process(&mutable value); // pass mutable reference
 ```
 
 ### Rules
-- Return type is always required — use `Void` if nothing returned
+- Return type is always required — use `()` if nothing returned
 - Parameter types are always required — no inference in function signatures
-- `return` is explicit — no implicit last-expression return
+- `return` is explicit — no implicit last-expression return at the statement level
+- Exception: **block expressions** used as values do return their tail (see [Control Flow](#control-flow))
 
 ---
 
@@ -517,18 +548,18 @@ public enum Direction {
 ```citrus
 // define a trait
 trait Speak {
-    speak(self) -> Void;
+    speak(self) -> ();
 }
 
 trait Walk {
-    walk(self, steps as UInt_32) -> Void;
+    walk(self, steps as UInt_32) -> ();
 }
 
 // trait with default implementation
 trait Describe {
     describe(self) -> Text;
 
-    print_description(self) -> Void {
+    print_description(self) -> () {
         println!("{}", self.describe());
     }
 }
@@ -549,21 +580,21 @@ implement Animal {
         return &self.name;
     }
 
-    set_height(mutable self, h as Int_32) -> Void {
+    set_height(mutable self, h as Int_32) -> () {
         self.height = h;
     }
 }
 
 // implement a trait for a struct
 implement Speak for Animal {
-    speak(self) -> Void {
+    speak(self) -> () {
         println!("{} speaks", self.name);
     }
 }
 
 // implement multiple traits
 implement Walk for Animal {
-    walk(self, steps as UInt_32) -> Void {
+    walk(self, steps as UInt_32) -> () {
         println!("Walking {} steps", steps);
     }
 }
@@ -746,6 +777,27 @@ match result {
 }
 ```
 
+### Block Expressions
+
+A block `{ }` can be used as an expression. The last expression in the block (the **tail**) is its value — no semicolon on the tail.
+
+```citrus
+// block as an initializer
+let x = {
+    let p = 6;
+    5 * p        // tail — no semicolon — this is the value of the block
+};
+
+// block in a condition
+let result = if condition {
+    compute_a()
+} else {
+    compute_b()
+};
+```
+
+> Statements inside a block still end with `;`. Only the tail expression is semicolon-free.
+
 ---
 
 ## Iterators and Ranges
@@ -857,17 +909,25 @@ items.clear();
 
 ### Defining a Macro
 
+Macros use **match-arm syntax** — each arm has a token pattern and an expansion body. `$name` captures a metavariable from the call site.
+
 ```citrus
-macro log!(message) {
-    // expands at compile time
+macro log! {
+    ($message) => {
+        // expands to: print message with context
+    }
 }
 
-macro assert!(condition, message) {
-    // ...
+macro assert! {
+    ($condition, $message) => {
+        // expands to: check condition, panic with message if false
+    }
 }
 
-macro make_struct!(name, field, field_type) {
-    // generates a struct definition
+// multiple arms — matched top to bottom
+macro debug! {
+    ($val)           => { println!("{:?}", $val); }
+    ($fmt, $val)     => { println!($fmt, $val); }
 }
 ```
 
@@ -893,7 +953,7 @@ println!("Hello {}", name)      // print with newline
 print!("Hello {}", name)        // print without newline
 format!("value: {}", x)         // build a Text value
 panic!("unrecoverable error")   // halt immediately
-assert!(x > 0, "must be positive")
+assert!($x > 0, "must be positive")
 Vector![1, 2, 3]
 ```
 
@@ -901,7 +961,7 @@ Vector![1, 2, 3]
 
 ## Attributes
 
-Applied with `@` prefix before any item.
+Applied with `@` prefix before any item. Attributes are part of the language AST and are available to the semantic stage and attribute macros.
 
 ```citrus
 // derive common trait implementations
@@ -928,10 +988,12 @@ fast_add(x as Int_32, y as Int_32) -> Int_32 {
 get_users() -> Result<Vector<Text>, Text> { }
 
 @test
-test_addition() -> Void {
+test_addition() -> () {
     assert!(add(1, 2) == 3, "addition failed");
 }
 ```
+
+Attributes are valid on: functions, structs, enums, and traits.
 
 ---
 
@@ -1003,7 +1065,7 @@ public struct Animal {
 
 // public trait
 public trait Speak {
-    speak(self) -> Void;
+    speak(self) -> ();
 }
 
 // public function
@@ -1021,7 +1083,7 @@ implement Animal {
     }
 
     // private — only accessible within the module
-    internal_reset(mutable self) -> Void {
+    internal_reset(mutable self) -> () {
         self.height = 0;
     }
 }
@@ -1095,6 +1157,10 @@ static NAME as Type = value;
 
 // function
 fn_name(param as Type) -> RetType { return value; }
+fn_name(param as Type) -> () { }    // no return value
+
+// block expression
+let x = { let p = 6; 5 * p };      // tail is the value
 
 // struct
 struct Name { field as Type }
@@ -1124,11 +1190,19 @@ Some(value)   None
 // result
 Ok(value)     Err(error)
 
+// tuples
+let pair as (Int_32, Text) = (42, "hello");
+let (a, b) = pair;
+()    // unit
+
 // ranges
 0..5    0..=5
 
 // import
 import module::Name;
+
+// macro definition
+macro name! { ($arg) => { ... } }
 
 // macro call
 name!(args)   name![args]   name!{args}
@@ -1136,6 +1210,7 @@ name!(args)   name![args]   name!{args}
 // attribute
 @derive(Trait)
 @deprecated("message")
+@inline
 ```
 
 ---
