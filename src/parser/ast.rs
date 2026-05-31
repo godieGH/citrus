@@ -46,6 +46,28 @@ pub enum Lit {
     Bool(bool),     // true or false
 }
 
+// Note:
+// Everything string-related is always owned, heap-backed, and simple.
+// Text = owned UTF-8 string (like Rust String only)
+// No borrowing layer, no lifetime complexity, no slices.
+
+// ─────────────────────────────────────────────
+// ATTRIBUTE
+// ─────────────────────────────────────────────
+// @derive(Debug, Clone)
+// @deprecated("use new_fn instead")
+// @inline
+// @route("GET", "/users")
+//
+// args are raw tokens — the semantic stage interprets them
+
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub name: String,
+    pub args: Vec<crate::lexer::Lexeme>, // raw tokens inside ()
+    pub span: Span,
+}
+
 // ─────────────────────────────────────────────
 // TYPE EXPRESSIONS
 // ─────────────────────────────────────────────
@@ -61,8 +83,7 @@ pub enum TypeExpr {
     Text,
     Char,
     Bool,
-    Void,
-    Any,
+    Tuple(Vec<TypeExpr>), // () = unit,  (T, U) = real tuple
 
     Int8,
     Int32,
@@ -198,6 +219,8 @@ pub enum Pattern {
         end: Box<Pattern>,
         inclusive: bool,
     },
+
+    Tuple(Vec<Pattern>), // () or (a, b) destructuring
 }
 
 // ─────────────────────────────────────────────
@@ -366,6 +389,20 @@ pub enum Expr {
     // ── ? operator ───────────────────────────
     // result?   — propagates Err early
     Try(Box<SpannedExpr>),
+
+    MacroCall {
+        name: String,
+        delim: MacroDelim,
+        args: Vec<crate::lexer::Lexeme>, // raw tokens, unexpanded
+    },
+
+    Block(Block), // for block expressions
+
+    Tuple(Vec<SpannedExpr>), // () = unit,  (a, b) = real
+
+    // ── array literal ─────────────────────────
+    // [1, 2, 3, 4, 5]
+    ArrayLiteral(Vec<SpannedExpr>),
 }
 
 // ─────────────────────────────────────────────
@@ -445,12 +482,12 @@ pub enum ElseBranch {
 // ─────────────────────────────────────────────
 // A block is a sequence of statements inside { }.
 // Blocks appear in function bodies, if/else, loops.
-// In Citrus a block does NOT implicitly return a value
-// — you must use explicit return.
+// In Citrus blocks act as in rust return last expr
 
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<SpannedStmt>,
+    pub tail: Option<Box<SpannedExpr>>,
     pub span: Span,
 }
 
@@ -551,6 +588,7 @@ pub enum Item {
     Import(ImportDecl),
     Static(StaticDecl),
     Module(ModuleDecl),
+    Macro(MacroDef),
 }
 
 // ─────────────────────────────────────────────
@@ -562,10 +600,11 @@ pub enum Item {
 #[derive(Debug, Clone)]
 pub struct FunctionDef {
     pub public: bool,
+    pub attributes: Vec<Attribute>,
     pub name: String,
     pub generics: Vec<String>, // the T in fn<T>
     pub params: Vec<Param>,
-    pub ret: TypeExpr,                 // return type — Void if nothing
+    pub ret: TypeExpr,                 // return type — () if nothing
     pub where_clause: Vec<WhereBound>, // where T implements Speak + Walk
     pub body: Block,
     pub span: Span,
@@ -597,6 +636,7 @@ pub struct WhereBound {
 #[derive(Debug, Clone)]
 pub struct StructDef {
     pub public: bool,
+    pub attributes: Vec<Attribute>,
     pub name: String,
     pub generics: Vec<String>,
     pub fields: Vec<StructField>,
@@ -619,6 +659,7 @@ pub struct StructField {
 #[derive(Debug, Clone)]
 pub struct EnumDef {
     pub public: bool,
+    pub attributes: Vec<Attribute>,
     pub name: String,
     pub generics: Vec<String>,
     pub variants: Vec<EnumVariant>,
@@ -643,12 +684,13 @@ pub enum EnumVariantKind {
 // ─────────────────────────────────────────────
 // TRAIT DEFINITION
 // ─────────────────────────────────────────────
-// trait Speak { speak(self) -> Void; }
-// trait Describe { describe(self) -> Text; print_description(self) -> Void { } }
+// trait Speak { speak(self) -> (); }
+// trait Describe { describe(self) -> Text; print_description(self) -> () { } }
 
 #[derive(Debug, Clone)]
 pub struct TraitDef {
     pub public: bool,
+    pub attributes: Vec<Attribute>,
     pub name: String,
     pub generics: Vec<String>,
     pub methods: Vec<TraitMethod>,
@@ -682,8 +724,9 @@ pub struct ImplBlock {
 #[derive(Debug, Clone)]
 pub struct ImplTraitBlock {
     pub trait_name: String,
+    pub trait_generics: Vec<String>,
     pub target: String,
-    pub generics: Vec<String>,
+    pub target_generics: Vec<String>,
     pub where_clause: Vec<WhereBound>,
     pub methods: Vec<FunctionDef>,
     pub span: Span,
@@ -736,6 +779,27 @@ pub struct ModuleDecl {
     pub name: String,
     pub items: Vec<Spanned<Item>>,
     pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum MacroDelim {
+    Paren,
+    Bracket,
+    Brace,
+}
+
+#[derive(Debug, Clone)]
+pub struct MacroDef {
+    pub public: bool,
+    pub name: String,
+    pub arms: Vec<MacroArm>,
+}
+
+// one arm — pattern => { body }
+#[derive(Debug, Clone)]
+pub struct MacroArm {
+    pub pattern: Vec<crate::lexer::Lexeme>, // raw tokens
+    pub body: Vec<crate::lexer::Lexeme>,    // raw tokens
 }
 
 // ─────────────────────────────────────────────

@@ -1,7 +1,9 @@
 
-main() -> Int_32 {
-  let a as UInt_8 = 500;
-  let x as Int_32 = 60;
-  let name as Char = 'c';
-  println!(a);
+main() -> size {
+  
+  let x = {
+    let p = 6;
+    5 * p
+  };
+  
 }

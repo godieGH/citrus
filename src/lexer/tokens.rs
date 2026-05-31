@@ -66,10 +66,6 @@ pub enum Token {
     TypeChar,
     #[token("Bool")]
     TypeBool,
-    #[token("Any")]
-    TypeAny,
-    #[token("Void")]
-    TypeVoid,
 
     #[token("Int_8")]
     TypeInt8,
@@ -228,6 +224,8 @@ pub enum Token {
     Question,
     #[token("=>")]
     FatArrow,
+    #[token("$")]
+    Dollar,
 
     #[token("in")]
     In,

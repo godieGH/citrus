@@ -48,14 +48,6 @@ impl Parser {
                 self.advance();
                 Ok(TypeExpr::Bool)
             }
-            Some(Token::TypeVoid) => {
-                self.advance();
-                Ok(TypeExpr::Void)
-            }
-            Some(Token::TypeAny) => {
-                self.advance();
-                Ok(TypeExpr::Any)
-            }
 
             Some(Token::TypeInt8) => {
                 self.advance();
@@ -103,6 +95,7 @@ impl Parser {
             // a name — either a custom type or a generic like Option<T>
             // Option, Result, Vector, Animal, MyStruct, T ...
             Some(Token::Identifier) => self.parse_named_type(),
+            Some(Token::LParen) => self.parse_tuple_type(),
 
             // anything else is not a valid type
             _ => Err(self.error_expected(
@@ -199,7 +192,7 @@ impl Parser {
     // Token stream for <Text, Int_32>:
     //   Lt  TypeText  Comma  TypeInt32  Gt
 
-    fn parse_generic_args(&mut self) -> Result<Vec<TypeExpr>, CitrusError> {
+    pub fn parse_generic_args(&mut self) -> Result<Vec<TypeExpr>, CitrusError> {
         self.expect(&Token::Lt)?;
 
         let mut args = Vec::new();
@@ -314,5 +307,36 @@ impl Parser {
         }
 
         Ok(bounds)
+    }
+
+    fn parse_tuple_type(&mut self) -> Result<TypeExpr, CitrusError> {
+        self.expect(&Token::LParen)?;
+
+        // () — unit type
+        if self.eat(&Token::RParen) {
+            return Ok(TypeExpr::Tuple(vec![]));
+        }
+
+        let first = self.parse_type()?;
+
+        // (T) — grouping only, not a tuple
+        if self.check(&Token::RParen) {
+            self.advance();
+            return Ok(first);
+        }
+
+        // (T,) or (T, U, ...) — real tuple
+        self.expect(&Token::Comma)?;
+        let mut types = vec![first];
+
+        while !self.check(&Token::RParen) && !self.at_end() {
+            types.push(self.parse_type()?);
+            if !self.eat(&Token::Comma) {
+                break;
+            }
+        }
+
+        self.expect(&Token::RParen)?;
+        Ok(TypeExpr::Tuple(types))
     }
 }

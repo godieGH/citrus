@@ -19,7 +19,14 @@ fn main() -> anyhow::Result<()> {
         match arg.as_str() {
             "--release" => opts.release = true,
             "--emit-ir" => opts.emit_ir = true,
-            _ => file_path = Some(arg),
+            _ => {
+                if file_path.is_none() {
+                    file_path = Some(arg);
+                } else {
+                    eprintln!("unexpected argument: {}", arg);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 

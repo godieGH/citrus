@@ -19,22 +19,19 @@ impl Parser {
     // looks at the next token to decide what kind of item this is.
 
     pub fn parse_item(&mut self) -> Result<Item, CitrusError> {
-        // `public` is optional and applies to most items
+        let attrs = self.parse_attributes()?;
         let is_public = self.eat(&Token::Public);
 
         match self.current() {
-            Some(Token::Struct) => self.parse_struct(is_public),
-            Some(Token::Enum) => self.parse_enum_def(is_public),
-            Some(Token::Trait) => self.parse_trait(is_public),
+            Some(Token::Struct) => self.parse_struct(is_public, attrs),
+            Some(Token::Enum) => self.parse_enum_def(is_public, attrs),
+            Some(Token::Trait) => self.parse_trait(is_public, attrs),
             Some(Token::Implement) => self.parse_implement(is_public),
             Some(Token::Import) => self.parse_import(),
             Some(Token::Static) => self.parse_static(is_public),
             Some(Token::Module) => self.parse_module(is_public),
-
-            // an identifier at the top level means a function
-            // no keyword needed — name( is enough to identify it
-            Some(Token::Identifier) => self.parse_function(is_public),
-
+            Some(Token::Macro) => self.parse_macro_def(is_public),
+            Some(Token::Identifier) => self.parse_function(is_public, attrs),
             _ => Err(self.error_expected(
                 "function, struct, enum, trait, implement, import, static, or module".to_string(),
             )),
@@ -52,40 +49,38 @@ impl Parser {
     //
     // No `fn` keyword — the name followed by ( is enough.
 
-    fn parse_function(&mut self, public: bool) -> Result<Item, CitrusError> {
-        let def = self.parse_function_def(public)?;
+    fn parse_function(&mut self, public: bool, attrs: Vec<Attribute>) -> Result<Item, CitrusError> {
+        let def = self.parse_function_def(public, attrs)?;
         Ok(Item::Function(def))
     }
 
     // Separated from parse_function so impl blocks can reuse it.
     // Impl block methods are also function defs — same syntax.
-    pub fn parse_function_def(&mut self, public: bool) -> Result<FunctionDef, CitrusError> {
+    pub fn parse_function_def(
+        &mut self,
+        public: bool,
+        attrs: Vec<Attribute>,
+    ) -> Result<FunctionDef, CitrusError> {
         let span = self.span();
-
-        // the function name — any identifier including `main`
         let name = self.expect_identifier()?;
-
-        // optional generic params — <T, U>
         let generics = self.parse_generic_params()?;
 
-        // parameter list — always present, may be empty
         self.expect(&Token::LParen)?;
         let params = self.parse_params()?;
         self.expect(&Token::RParen)?;
 
-        // return type — always required in Citrus
-        // use Void if nothing is returned
-        self.expect(&Token::Arrow)?;
-        let ret = self.parse_type()?;
+        let ret = if self.eat(&Token::Arrow) {
+            self.parse_type()?
+        } else {
+            TypeExpr::Tuple(vec![])
+        };
 
-        // optional where clause — where T implements Speak + Walk
         let where_clause = self.parse_where_clause()?;
-
-        // the function body
         let body = self.parse_block()?;
 
         Ok(FunctionDef {
             public,
+            attributes: attrs,
             name,
             generics,
             params,
@@ -132,7 +127,7 @@ impl Parser {
             self.advance();
             return Ok(Param {
                 name: "self".to_string(),
-                ty: TypeExpr::Void, // semantic stage handles self type
+                ty: TypeExpr::Tuple(vec![]),
                 mutable: false,
                 is_self: true,
             });
@@ -145,7 +140,7 @@ impl Parser {
             self.advance(); // consume `self`
             return Ok(Param {
                 name: "self".to_string(),
-                ty: TypeExpr::Void,
+                ty: TypeExpr::Tuple(vec![]),
                 mutable: true,
                 is_self: true,
             });
@@ -172,21 +167,15 @@ impl Parser {
     // struct Animal { name as Text, height as Int_32 }
     // public struct Box<T> { value as T }
 
-    fn parse_struct(&mut self, public: bool) -> Result<Item, CitrusError> {
+    fn parse_struct(&mut self, public: bool, attrs: Vec<Attribute>) -> Result<Item, CitrusError> {
         let span = self.span();
         self.expect(&Token::Struct)?;
-
         let name = self.expect_identifier()?;
         let generics = self.parse_generic_params()?;
 
         self.expect(&Token::LBrace)?;
-
         let mut fields = Vec::new();
-
-        // parse fields until we see }
-        // each field:  name as Type
         while !self.check(&Token::RBrace) && !self.at_end() {
-            let field_span = self.span();
             let field_name = self.expect_identifier()?;
             self.expect(&Token::As)?;
             let ty = self.parse_type()?;
@@ -194,18 +183,15 @@ impl Parser {
                 name: field_name,
                 ty,
             });
-
-            // fields are separated by commas
-            // trailing comma is allowed
             if !self.eat(&Token::Comma) {
                 break;
             }
         }
-
         self.expect(&Token::RBrace)?;
 
         Ok(Item::Struct(StructDef {
             public,
+            attributes: attrs,
             name,
             generics,
             fields,
@@ -222,35 +208,31 @@ impl Parser {
     // enum Status { Active = 1, Inactive = 2 }
     // enum Message { Quit, Move { x as Int_32, y as Int_32 }, Write(Text) }
 
-    fn parse_enum_def(&mut self, public: bool) -> Result<Item, CitrusError> {
+    fn parse_enum_def(&mut self, public: bool, attrs: Vec<Attribute>) -> Result<Item, CitrusError> {
         let span = self.span();
         self.expect(&Token::Enum)?;
-
         let name = self.expect_identifier()?;
         let generics = self.parse_generic_params()?;
 
         self.expect(&Token::LBrace)?;
-
         let mut variants = Vec::new();
-
         while !self.check(&Token::RBrace) && !self.at_end() {
             variants.push(self.parse_enum_variant()?);
             if !self.eat(&Token::Comma) {
                 break;
             }
         }
-
         self.expect(&Token::RBrace)?;
 
         Ok(Item::Enum(EnumDef {
             public,
+            attributes: attrs,
             name,
             generics,
             variants,
             span,
         }))
     }
-
     fn parse_enum_variant(&mut self) -> Result<EnumVariant, CitrusError> {
         let span = self.span();
         let name = self.expect_identifier()?;
@@ -326,38 +308,34 @@ impl Parser {
     // TRAITS
     // ═════════════════════════════════════════════════════════════════
     //
-    // trait Speak { speak(self) -> Void; }
+    // trait Speak { speak(self) -> (); }
     // trait Describe {
     //     describe(self) -> Text;
-    //     print_description(self) -> Void { println!("{}", self.describe()); }
+    //     print_description(self) -> () { println!("{}", self.describe()); }
     // }
 
-    fn parse_trait(&mut self, public: bool) -> Result<Item, CitrusError> {
+    fn parse_trait(&mut self, public: bool, attrs: Vec<Attribute>) -> Result<Item, CitrusError> {
         let span = self.span();
         self.expect(&Token::Trait)?;
-
         let name = self.expect_identifier()?;
         let generics = self.parse_generic_params()?;
 
         self.expect(&Token::LBrace)?;
-
         let mut methods = Vec::new();
-
         while !self.check(&Token::RBrace) && !self.at_end() {
             methods.push(self.parse_trait_method()?);
         }
-
         self.expect(&Token::RBrace)?;
 
         Ok(Item::Trait(TraitDef {
             public,
+            attributes: attrs,
             name,
             generics,
             methods,
             span,
         }))
     }
-
     fn parse_trait_method(&mut self) -> Result<TraitMethod, CitrusError> {
         let span = self.span();
         let name = self.expect_identifier()?;
@@ -366,8 +344,11 @@ impl Parser {
         let params = self.parse_params()?;
         self.expect(&Token::RParen)?;
 
-        self.expect(&Token::Arrow)?;
-        let ret = self.parse_type()?;
+        let ret = if self.eat(&Token::Arrow) {
+            self.parse_type()?
+        } else {
+            TypeExpr::Tuple(vec![]) // () — implicit unit return
+        };
 
         // a method either has a default body { ... }
         // or just a signature ending with ;
@@ -406,7 +387,6 @@ impl Parser {
         let generics = self.parse_generic_params()?;
 
         if self.eat(&Token::For) {
-            // implement TraitName for TargetName { ... }
             let target = self.expect_identifier()?;
             let target_generics = self.parse_generic_params()?;
             let where_clause = self.parse_where_clause()?;
@@ -417,8 +397,9 @@ impl Parser {
 
             Ok(Item::ImplTrait(ImplTraitBlock {
                 trait_name: first_name,
+                trait_generics: generics,
                 target,
-                generics,
+                target_generics,
                 where_clause,
                 methods,
                 span,
@@ -445,17 +426,14 @@ impl Parser {
     // The only difference is that methods can have `self` params.
     fn parse_impl_methods(&mut self) -> Result<Vec<FunctionDef>, CitrusError> {
         let mut methods = Vec::new();
-
         while !self.check(&Token::RBrace) && !self.at_end() {
-            // methods inside impl blocks can be public individually
+            let attrs = self.parse_attributes()?;
             let is_public = self.eat(&Token::Public);
-            let method = self.parse_function_def(is_public)?;
+            let method = self.parse_function_def(is_public, attrs)?;
             methods.push(method);
         }
-
         Ok(methods)
     }
-
     // ═════════════════════════════════════════════════════════════════
     // IMPORTS
     // ═════════════════════════════════════════════════════════════════
@@ -616,5 +594,138 @@ impl Parser {
             items,
             span,
         }))
+    }
+
+    fn parse_macro_def(&mut self, public: bool) -> Result<Item, CitrusError> {
+        self.expect(&Token::Macro)?;
+
+        let name = self.expect_identifier()?;
+
+        // the ! is part of the name visually but
+        // in the definition it is just decoration
+        // we eat it if present
+        self.eat(&Token::Bang);
+
+        self.expect(&Token::LBrace)?;
+
+        let mut arms = Vec::new();
+
+        while !self.check(&Token::RBrace) && !self.at_end() {
+            arms.push(self.parse_macro_arm()?);
+
+            // arms separated by commas, trailing comma allowed
+            if !self.eat(&Token::Comma) {
+                break;
+            }
+        }
+
+        self.expect(&Token::RBrace)?;
+
+        Ok(Item::Macro(MacroDef { public, name, arms }))
+    }
+
+    fn parse_macro_arm(&mut self) -> Result<MacroArm, CitrusError> {
+        // collect pattern tokens — everything before =>
+        let pattern = self.collect_until_fat_arrow()?;
+
+        self.expect(&Token::FatArrow)?;
+
+        // collect body tokens — everything inside { }
+        let body = self.collect_block_tokens()?;
+
+        Ok(MacroArm { pattern, body })
+    }
+
+    // collect raw tokens until we hit =>
+    fn collect_until_fat_arrow(&mut self) -> Result<Vec<crate::lexer::Lexeme>, CitrusError> {
+        let mut tokens = Vec::new();
+        loop {
+            match self.current() {
+                Some(Token::FatArrow) | None => break,
+                _ => tokens.push(self.advance().unwrap()),
+            }
+        }
+        Ok(tokens)
+    }
+
+    // collect raw tokens inside { } including nested braces
+    fn collect_block_tokens(&mut self) -> Result<Vec<crate::lexer::Lexeme>, CitrusError> {
+        self.expect(&Token::LBrace)?;
+        let mut tokens = Vec::new();
+        let mut depth = 1usize;
+
+        while !self.at_end() && depth > 0 {
+            match self.current() {
+                Some(Token::LBrace) => {
+                    depth += 1;
+                    tokens.push(self.advance().unwrap());
+                }
+                Some(Token::RBrace) => {
+                    depth -= 1;
+                    if depth > 0 {
+                        tokens.push(self.advance().unwrap());
+                    }
+                }
+                _ => tokens.push(self.advance().unwrap()),
+            }
+        }
+
+        self.expect(&Token::RBrace)?;
+        Ok(tokens)
+    }
+
+    // ── ATTRIBUTES ────────────────────────────────────────────────────
+    //
+    // Collects zero or more @ attributes before an item.
+    // @inline
+    // @derive(Debug, Clone)
+    // @route("GET", "/users")
+    //
+    // Each attribute name is an identifier. Arguments inside () are
+    // collected as raw tokens — the semantic stage interprets them.
+
+    fn parse_attributes(&mut self) -> Result<Vec<Attribute>, CitrusError> {
+        let mut attrs = Vec::new();
+        while self.check(&Token::At) {
+            attrs.push(self.parse_attribute()?);
+        }
+        Ok(attrs)
+    }
+
+    fn parse_attribute(&mut self) -> Result<Attribute, CitrusError> {
+        let span = self.span();
+        self.advance(); // consume @
+
+        let name = self.expect_identifier()?;
+
+        // optional argument list — raw tokens collected between ( )
+        let args = if self.check(&Token::LParen) {
+            self.advance(); // consume (
+            let mut tokens = Vec::new();
+            let mut depth = 1usize;
+
+            while !self.at_end() && depth > 0 {
+                match self.current() {
+                    Some(Token::LParen) => {
+                        depth += 1;
+                        tokens.push(self.advance().unwrap());
+                    }
+                    Some(Token::RParen) => {
+                        depth -= 1;
+                        if depth > 0 {
+                            tokens.push(self.advance().unwrap());
+                        }
+                    }
+                    _ => tokens.push(self.advance().unwrap()),
+                }
+            }
+
+            self.expect(&Token::RParen)?;
+            tokens
+        } else {
+            Vec::new()
+        };
+
+        Ok(Attribute { name, args, span })
     }
 }

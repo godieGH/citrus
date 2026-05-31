@@ -25,6 +25,7 @@ pub struct Parser {
     tokens: Vec<Lexeme>,
     cursor: usize,
     filename: String,
+    no_struct_expr: bool,
 }
 
 impl Parser {
@@ -33,6 +34,7 @@ impl Parser {
             tokens,
             cursor: 0,
             filename,
+            no_struct_expr: false,
         }
     }
 
