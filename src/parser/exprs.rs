@@ -498,60 +498,78 @@ impl Parser {
     // LITERAL PARSERS
     // ─────────────────────────────────────────────────────────────────
 
-    fn parse_int_literal(&mut self) -> Result<SpannedExpr, CitrusError> {
-        let span = self.span();
-        let lex = self.advance().unwrap();
+fn parse_int_literal(&mut self) -> Result<SpannedExpr, CitrusError> {
+    let span = self.span();
+    let lex = self.advance().unwrap();
 
-        // parse each base, stripping prefix and underscores
-        let val: i128 = match &lex.token {
-            Token::HexLiteral => {
-                let s = lex.src.trim_start_matches("0x").replace('_', "");
-                i128::from_str_radix(&s, 16)
-            }
-            Token::BinaryLiteral => {
-                let s = lex.src.trim_start_matches("0b").replace('_', "");
-                i128::from_str_radix(&s, 2)
-            }
-            Token::OctalLiteral => {
-                let s = lex.src.trim_start_matches("0o").replace('_', "");
-                i128::from_str_radix(&s, 8)
-            }
-            _ => {
-                let s = lex.src.replace('_', "");
-                s.parse::<i128>()
-            }
+    let val: i128 = match &lex.token {
+        Token::HexLiteral    => {
+            let s = lex.src.trim_start_matches("0x").replace('_', "");
+            i128::from_str_radix(&s, 16)
         }
-        .map_err(|_| CitrusError::ParseError {
-            expected: "valid integer literal".to_string(),
-            found: lex.src.clone(),
-            file: self.filename.clone(),
-            line: lex.line,
-            col: lex.col,
-        })?;
-
-        Ok(Spanned {
-            node: Expr::Literal(Lit::Int(val)),
-            span,
-        })
+        Token::BinaryLiteral => {
+            let s = lex.src.trim_start_matches("0b").replace('_', "");
+            i128::from_str_radix(&s, 2)
+        }
+        Token::OctalLiteral  => {
+            let s = lex.src.trim_start_matches("0o").replace('_', "");
+            i128::from_str_radix(&s, 8)
+        }
+        _ => {
+            let s = lex.src.replace('_', "");
+            s.parse::<i128>()
+        }
     }
+    .map_err(|_| CitrusError::ParseError {
+        expected: "valid integer literal".to_string(),
+        found:    lex.src.clone(),
+        file:     self.filename.clone(),
+        line:     lex.line,
+        col:      lex.col,
+        hint:     None,
+    })?;
 
-    fn parse_float_literal(&mut self) -> Result<SpannedExpr, CitrusError> {
-        let span = self.span();
-        let lex = self.advance().unwrap();
-        let s = lex.src.replace('_', "");
-        let val = s.parse::<f64>().map_err(|_| CitrusError::ParseError {
-            expected: "valid float literal".to_string(),
-            found: lex.src.clone(),
-            file: self.filename.clone(),
-            line: lex.line,
-            col: lex.col,
-        })?;
-        Ok(Spanned {
-            node: Expr::Literal(Lit::Float(val)),
-            span,
-        })
-    }
+    let suffix = match self.current() {
+        Some(Token::TypeInt8)    => { self.advance(); Some(IntSuffix::I8)    }
+        Some(Token::TypeInt16)   => { self.advance(); Some(IntSuffix::I16)   }
+        Some(Token::TypeInt32)   => { self.advance(); Some(IntSuffix::I32)   }
+        Some(Token::TypeInt64)   => { self.advance(); Some(IntSuffix::I64)   }
+        Some(Token::TypeInt128)  => { self.advance(); Some(IntSuffix::I128)  }
+        Some(Token::TypeISize)   => { self.advance(); Some(IntSuffix::ISize) }
+        Some(Token::TypeUInt8)   => { self.advance(); Some(IntSuffix::U8)    }
+        Some(Token::TypeUInt16)  => { self.advance(); Some(IntSuffix::U16)   }
+        Some(Token::TypeUInt32)  => { self.advance(); Some(IntSuffix::U32)   }
+        Some(Token::TypeUInt64)  => { self.advance(); Some(IntSuffix::U64)   }
+        Some(Token::TypeUInt128) => { self.advance(); Some(IntSuffix::U128)  }
+        Some(Token::TypeUSize)   => { self.advance(); Some(IntSuffix::USize) }
+        _ => None,
+    };
 
+    Ok(Spanned { node: Expr::Literal(Lit::Int(val, suffix)), span })
+}
+
+fn parse_float_literal(&mut self) -> Result<SpannedExpr, CitrusError> {
+    let span = self.span();
+    let lex = self.advance().unwrap();
+    let s = lex.src.replace('_', "");
+    let val = s.parse::<f64>().map_err(|_| CitrusError::ParseError {
+        expected: "valid float literal".to_string(),
+        found:    lex.src.clone(),
+        file:     self.filename.clone(),
+        line:     lex.line,
+        col:      lex.col,
+        hint:     None,
+    })?;
+
+    let suffix = match self.current() {
+        Some(Token::TypeFloat32) => { self.advance(); Some(FloatSuffix::F32) }
+        Some(Token::TypeFloat64) => { self.advance(); Some(FloatSuffix::F64) }
+        _ => None,
+    };
+
+    Ok(Spanned { node: Expr::Literal(Lit::Float(val, suffix)), span })
+}
+ 
     fn parse_string_literal(&mut self) -> Result<SpannedExpr, CitrusError> {
         let span = self.span();
         let lex = self.advance().unwrap();
@@ -605,6 +623,7 @@ impl Parser {
                         file: self.filename.clone(),
                         line: lex.line,
                         col: lex.col,
+                        hint: None,
                     });
                 }
             }
@@ -1268,8 +1287,8 @@ impl Parser {
             Some(Token::Minus) => {
                 self.advance();
                 let e = self.parse_int_literal()?;
-                if let Expr::Literal(Lit::Int(n)) = e.node {
-                    Ok(Pattern::Literal(Lit::Int(-n)))
+                if let Expr::Literal(Lit::Int(n, suffix)) = e.node {
+                    Ok(Pattern::Literal(Lit::Int(-n, suffix)))
                 } else {
                     Err(self.error_expected("integer after '-' in pattern".to_string()))
                 }

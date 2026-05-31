@@ -53,6 +53,10 @@ impl Parser {
                 self.advance();
                 Ok(TypeExpr::Int8)
             }
+            Some(Token::TypeInt16) => {
+                self.advance();
+                Ok(TypeExpr::Int16)
+            }
             Some(Token::TypeInt32) => {
                 self.advance();
                 Ok(TypeExpr::Int32)
@@ -65,10 +69,18 @@ impl Parser {
                 self.advance();
                 Ok(TypeExpr::Int128)
             }
+            Some(Token::TypeISize) => {
+                self.advance();
+                Ok(TypeExpr::ISize)
+            }
 
             Some(Token::TypeUInt8) => {
                 self.advance();
                 Ok(TypeExpr::UInt8)
+            }
+            Some(Token::TypeUInt16) => {
+                self.advance();
+                Ok(TypeExpr::UInt16)
             }
             Some(Token::TypeUInt32) => {
                 self.advance();
@@ -81,6 +93,10 @@ impl Parser {
             Some(Token::TypeUInt128) => {
                 self.advance();
                 Ok(TypeExpr::UInt128)
+            }
+            Some(Token::TypeUSize) => {
+                self.advance();
+                Ok(TypeExpr::USize)
             }
 
             Some(Token::TypeFloat32) => {

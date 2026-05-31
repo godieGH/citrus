@@ -12,10 +12,12 @@ pub struct Lexeme {
     pub col: usize,
 }
 
-/// Tokenize a source string into a list of Lexemes
-/// Returns errors as Err with position info
-pub fn tokenize(source: &str, filename: &str) -> Result<Vec<Lexeme>, crate::error::CitrusError> {
+/// Tokenize a source string into a list of Lexemes.
+/// Lex errors are pushed into the DiagnosticBag rather than returned as Err,
+/// so the caller can accumulate all bad tokens in one pass (same pattern as the parser).
+pub fn tokenize(source: &str, filename: &str) -> (Vec<Lexeme>, crate::diagnostics::DiagnosticBag) {
     let mut lexemes = Vec::new();
+    let mut bag = crate::diagnostics::DiagnosticBag::new();
     let mut line = 1usize;
     let mut col = 1usize;
     let mut lexer = Token::lexer(source);
@@ -48,17 +50,18 @@ pub fn tokenize(source: &str, filename: &str) -> Result<Vec<Lexeme>, crate::erro
                 });
             }
             Err(_) => {
-                return Err(crate::error::CitrusError::LexError {
-                    file: filename.to_string(),
+                // push to bag — lets us report every bad token instead of stopping at the first
+                bag.push(crate::diagnostics::Diagnostic::error(
+                    format!("unknown token '{token_text}'"),
+                    filename,
                     line,
                     col,
-                    src: token_text,
-                });
+                ).with_len(token_text.len()));
             }
         }
 
         last_end = span.end;
     }
 
-    Ok(lexemes)
+    (lexemes, bag)
 }

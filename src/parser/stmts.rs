@@ -24,6 +24,7 @@
 
 use super::Parser;
 use super::ast::*;
+use crate::diagnostics::Diagnostic;
 use crate::error::CitrusError;
 use crate::lexer::Token;
 
@@ -47,16 +48,38 @@ impl Parser {
             if self.is_value_less_stmt() {
                 // these keywords can never produce a value — always statements
                 let stmt_span = self.span();
-                let stmt = self.parse_stmt()?;
-                stmts.push(Spanned {
-                    node: stmt,
-                    span: stmt_span,
-                });
+                match self.parse_stmt() {
+                    Ok(stmt) => stmts.push(Spanned { node: stmt, span: stmt_span }),
+                    Err(e) => {
+                        // recover: record the error, push a sentinel, skip to a safe point
+                        let (line, col) = match &e {
+                            CitrusError::ParseError { line, col, .. } => (*line, *col),
+                            _ => (stmt_span.line, stmt_span.col),
+                        };
+                        let filename = self.filename.clone();
+                        self.bag.push(Diagnostic::error(e.to_string(), &filename, line, col));
+                        stmts.push(Spanned { node: Stmt::Error, span: stmt_span });
+                        self.synchronize();
+                    }
+                }
             } else {
                 // everything else — parse as expression, then check the terminator
                 // this includes `if` and `match` which CAN be tail values
                 let expr_span = self.span();
-                let expr = self.parse_expr()?;
+                let expr = match self.parse_expr() {
+                    Ok(e) => e,
+                    Err(e) => {
+                        let (line, col) = match &e {
+                            CitrusError::ParseError { line, col, .. } => (*line, *col),
+                            _ => (expr_span.line, expr_span.col),
+                        };
+                        let filename = self.filename.clone();
+                        self.bag.push(Diagnostic::error(e.to_string(), &filename, line, col));
+                        stmts.push(Spanned { node: Stmt::Error, span: expr_span });
+                        self.synchronize();
+                        continue;
+                    }
+                };
 
                 if self.check(&Token::RBrace) {
                     // no semicolon before } — this is the tail value
@@ -65,11 +88,19 @@ impl Parser {
                 }
 
                 // semicolon present — value is discarded, treat as statement
-                self.expect(&Token::Semicolon)?;
-                stmts.push(Spanned {
-                    node: Stmt::Expr(expr),
-                    span: expr_span,
-                });
+                if let Err(e) = self.expect(&Token::Semicolon) {
+                    // missing semicolon — emit, treat expr as a stmt anyway, keep going
+                    let (line, col) = match &e {
+                        CitrusError::ParseError { line, col, .. } => (*line, *col),
+                        _ => (expr_span.line, expr_span.col),
+                    };
+                    let filename = self.filename.clone();
+                    self.bag.push(
+                        Diagnostic::error(e.to_string(), &filename, line, col)
+                            .with_hint("add `;` here"),
+                    );
+                }
+                stmts.push(Spanned { node: Stmt::Expr(expr), span: expr_span });
             }
         }
 

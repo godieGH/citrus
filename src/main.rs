@@ -1,5 +1,6 @@
 // src/main.rs
 mod compiler;
+mod diagnostics;
 mod error;
 mod lexer;
 mod load_source;
@@ -42,7 +43,11 @@ fn main() -> anyhow::Result<()> {
     let file = load_source::load(path)?;
 
     // runs the compiler full pipeline
-    compiler::compile(file, opts)?;
+    // compile() uses () as its error type (diagnostics are already printed inside),
+    // so we convert failure to a process exit rather than propagating through anyhow
+    if compiler::compile(file, opts).is_err() {
+        std::process::exit(1);
+    }
 
     Ok(())
 }

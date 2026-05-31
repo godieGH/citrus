@@ -38,13 +38,19 @@ pub type SpannedStmt = Spanned<Stmt>;
 
 #[derive(Debug, Clone)]
 pub enum Lit {
-    Int(i128),      // covers all integer types — semantic stage narrows it
-    Float(f64),     // covers Float_32 and Float_64
+    Int(i128, Option<IntSuffix>), // covers all integer types — semantic stage narrows it
+    Float(f64, Option<FloatSuffix>), // covers Float_32 and Float_64
     Str(String),    // regular string "hello"
     RawStr(String), // raw string R"hello"
     Char(char),     // character 'F'
     Bool(bool),     // true or false
 }
+
+#[derive(Debug, Clone)]
+pub enum IntSuffix  { I8, I16, I32, I64, I128, ISize, U8, U16, U32, U64, U128, USize }
+
+#[derive(Debug, Clone)]
+pub enum FloatSuffix { F32, F64 }
 
 // Note:
 // Everything string-related is always owned, heap-backed, and simple.
@@ -86,13 +92,17 @@ pub enum TypeExpr {
     Tuple(Vec<TypeExpr>), // () = unit,  (T, U) = real tuple
 
     Int8,
+    Int16,
     Int32,
     Int64,
     Int128,
+    ISize,           // pointer-width signed
     UInt8,
+    UInt16,
     UInt32,
     UInt64,
     UInt128,
+    USize,           // pointer-width unsigned
     Float32,
     Float64,
 
@@ -403,6 +413,10 @@ pub enum Expr {
     // ── array literal ─────────────────────────
     // [1, 2, 3, 4, 5]
     ArrayLiteral(Vec<SpannedExpr>),
+    
+    
+    
+    Error,
 }
 
 // ─────────────────────────────────────────────
@@ -560,6 +574,10 @@ pub enum Stmt {
     // a function call or assignment.
     // fn_call();   x += 1;
     Expr(SpannedExpr),
+    
+    
+    
+    Error,
 }
 
 // The loop variable(s) in a for-in
@@ -589,6 +607,8 @@ pub enum Item {
     Static(StaticDecl),
     Module(ModuleDecl),
     Macro(MacroDef),
+    
+    Error,
 }
 
 // ─────────────────────────────────────────────

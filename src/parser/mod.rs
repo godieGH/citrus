@@ -6,6 +6,7 @@ mod items;
 mod stmts;
 mod types;
 
+use crate::diagnostics::{Diagnostic, DiagnosticBag};
 use crate::error::CitrusError;
 use crate::lexer::{Lexeme, Token};
 use ast::*;
@@ -26,6 +27,7 @@ pub struct Parser {
     cursor: usize,
     filename: String,
     no_struct_expr: bool,
+    pub bag: DiagnosticBag,  // collects errors without stopping
 }
 
 impl Parser {
@@ -35,6 +37,7 @@ impl Parser {
             cursor: 0,
             filename,
             no_struct_expr: false,
+            bag: DiagnosticBag::new(),
         }
     }
 
@@ -184,6 +187,48 @@ impl Parser {
     fn spanned<T>(&self, node: T, span: Span) -> Spanned<T> {
         Spanned { node, span }
     }
+    
+    
+      // ── RECOVERY ─────────────────────────────────────────────────────
+    //
+    // Called after pushing a diagnostic when we want to keep parsing.
+    // Skips tokens until we're at a point where a new statement or
+    // item can start — avoids a cascade of follow-on errors.
+
+    pub fn synchronize(&mut self) {
+        // a semicolon ends a statement — safe to continue after it
+        if self.eat(&Token::Semicolon) {
+            return;
+        }
+        while !self.at_end() {
+            // stop BEFORE tokens that start something new
+            match self.current() {
+                Some(
+                    Token::Let    | Token::Return | Token::If     |
+                    Token::While  | Token::For    | Token::Loop   |
+                    Token::Break  | Token::Continue               |
+                    Token::Struct | Token::Enum   | Token::Trait  |
+                    Token::Implement | Token::Import | Token::Static |
+                    Token::Module | Token::Macro
+                ) => return,
+                // a closing brace ends a block — stop before it so
+                // the parent block parser can consume it properly
+                Some(Token::RBrace) => return,
+                _ => { self.advance(); }
+            }
+        }
+    }
+    
+       // ── EMIT HELPERS ─────────────────────────────────────────────────
+    //
+    // Push a diagnostic and return an error sentinel — lets call sites do:
+    //   return Ok(self.emit_error("...", line, col));
+    // keeping the function signature as Result while still recovering.
+
+    pub fn emit_error(&mut self, msg: impl Into<String>, line: usize, col: usize) -> SpannedExpr {
+        self.bag.push(Diagnostic::error(msg, &self.filename, line, col));
+        Spanned { node: Expr::Error, span: Span { line, col } }
+    }
 
     // ── ERROR HELPERS ─────────────────────────────────────────────────
     //
@@ -191,6 +236,7 @@ impl Parser {
     // These are not returned yet — the caller decides when to return them.
 
     fn error_expected(&self, expected: String) -> CitrusError {
+        // kept for the ? sites that remain truly fatal
         let (line, col, found) = self.current_description();
         CitrusError::ParseError {
             expected,
@@ -198,6 +244,7 @@ impl Parser {
             line,
             col,
             file: self.filename.clone(),
+            hint: None,
         }
     }
 
@@ -205,6 +252,7 @@ impl Parser {
         CitrusError::UnexpectedEof {
             file: self.filename.clone(),
             message,
+            hint: None,
         }
     }
 
@@ -233,29 +281,41 @@ impl Parser {
     // parse() is called by compiler.rs — it drives the whole parse.
     // A Citrus file is just a sequence of top-level items until we
     // reach the end of the file.
+    
+       // ── ENTRY POINT ──────────────────────────────────────────────────
 
-    pub fn parse(mut self) -> Result<Program, CitrusError> {
+    pub fn parse(mut self) -> (Program, DiagnosticBag) {
         let filename = self.filename.clone();
         let mut items = Vec::new();
 
         while !self.at_end() {
             let start = self.span();
-            let item = self.parse_item()?;
-            items.push(Spanned {
-                node: item,
-                span: start,
-            });
+            match self.parse_item() {
+                Ok(item) => items.push(Spanned { node: item, span: start }),
+                Err(e) => {
+                    // fatal parse error — convert to diagnostic, try to recover
+                    let (line, col) = match &e {
+                        CitrusError::ParseError { line, col, .. } => (*line, *col),
+                        _ => (0, 0),
+                    };
+                    self.bag.push(Diagnostic::error(e.to_string(), &filename, line, col));
+                    items.push(Spanned { node: Item::Error, span: start });
+                    self.synchronize();
+                }
+            }
         }
 
-        Ok(Program { items, filename })
+        let program = Program { items, filename };
+        (program, self.bag)
     }
+
 }
 
 // ─────────────────────────────────────────────
 // PUBLIC ENTRY POINT
 // ─────────────────────────────────────────────
 // Called from compiler.rs:
-//   let ast = parser::parse(lexemes, filename)?;
-pub fn parse(tokens: Vec<Lexeme>, filename: String) -> Result<Program, CitrusError> {
+//   let (ast, parse_diags) = parser::parse(lexemes, filename);
+pub fn parse(tokens: Vec<Lexeme>, filename: String) -> (Program, DiagnosticBag) {
     Parser::new(tokens, filename).parse()
 }

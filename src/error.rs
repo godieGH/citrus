@@ -33,9 +33,10 @@ pub enum CitrusError {
         file: String,
         line: usize,
         col: usize,
+        hint: Option<String>,
     },
 
     // when we reach end of file unexpectedly
     #[error("unexpected end of file in {file} — {message}")]
-    UnexpectedEof { file: String, message: String },
+    UnexpectedEof { file: String, message: String, hint: Option<String>,},
 }

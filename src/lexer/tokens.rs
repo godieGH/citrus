@@ -68,26 +68,48 @@ pub enum Token {
     TypeBool,
 
     #[token("Int_8")]
+    #[token("i8")]
     TypeInt8,
+    #[token("Int_16")]
+    #[token("i16")]
+    TypeInt16,
     #[token("Int_32")]
+    #[token("i32")]
     TypeInt32,
     #[token("Int_64")]
+    #[token("i64")]
     TypeInt64,
     #[token("Int_128")]
+    #[token("i128")]
     TypeInt128,
+    #[token("ISize")]
+    #[token("isize")]
+    TypeISize,
 
     #[token("UInt_8")]
+    #[token("u8")]
     TypeUInt8,
+    #[token("UInt_16")]
+    #[token("u16")]
+    TypeUInt16,
     #[token("UInt_32")]
+    #[token("u32")]
     TypeUInt32,
     #[token("UInt_64")]
+    #[token("u64")]
     TypeUInt64,
     #[token("UInt_128")]
+    #[token("u128")]
     TypeUInt128,
+    #[token("USize")]
+    #[token("usize")]
+    TypeUSize,
 
     #[token("Float_32")]
+    #[token("f32")]
     TypeFloat32,
     #[token("Float_64")]
+    #[token("f64")]
     TypeFloat64,
 
     // --- Compound Assignment (must be before single operators) ---

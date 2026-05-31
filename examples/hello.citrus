@@ -1,5 +1,4 @@
 
-@derive(Debug)
-struct Car {
-  name as Text
+main() {
+  let x = 50 UInt_32;
 }
