@@ -254,7 +254,6 @@ impl Parser {
 // ─────────────────────────────────────────────
 // Called from compiler.rs:
 //   let ast = parser::parse(lexemes, filename)?;
-
 pub fn parse(tokens: Vec<Lexeme>, filename: String) -> Result<Program, CitrusError> {
     Parser::new(tokens, filename).parse()
 }
